@@ -1,2 +1,5 @@
 # railway-timetable-conflict-detection-and-resolution
-A python based optimization tool designed to identify scheduling overlaps in railway timetables. Features automated conflict detection and a resolution engine to ensure smooth, collision- free operations of train and minimizing the delays.
+This project is a python based tool designed to automate the scheduling of trains. It identifies timing and platform overlaps and provides an optimized, resolved timetable.
+Features: Automated Detection
+          Conflict Resolution
+          
