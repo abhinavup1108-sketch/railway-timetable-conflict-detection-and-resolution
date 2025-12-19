@@ -11,18 +11,20 @@ TEST_MODE = False   # Set True only for developer testing
 # DATA MODEL
 
 class TrainSchedule:
-    def __init__(self, train_id, platform, start_time, end_time):
+    def __init__(self, train_id, platform, start_time, end_time, priority):
         self.train_id = train_id
         self.platform = platform
         self.start_time = start_time
         self.end_time = end_time
+        self.priority = priority
 
     def __repr__(self):
         return (
             f"Train {self.train_id} | "
             f"Platform: {self.platform} | "
             f"Start: {self.start_time} | "
-            f"End: {self.end_time}"
+            f"End: {self.end_time} | "
+            f"Priority: {self.priority}"
         )
 
 
@@ -68,27 +70,57 @@ def resolve_conflicts(timetable, platforms):
     2. If not possible, apply minimal delay
     """
     timetable.sort(key=lambda x: x.start_time)
-    for i in range(len(timetable)):
-        for j in range(i + 1, len(timetable)):
-            earlier = timetable[i]
-            later = timetable[j]
 
-            if earlier.platform == later.platform and intervals_overlap(earlier, later):
-                # Attempt platform reassignment
-                reassigned = False
-                for p in platforms:
-                    if p != later.platform and is_platform_free(
-                        timetable, p, later.start_time, later.end_time, later
-                    ):
-                        later.platform = p
-                        reassigned = True
-                        break
+    for train in timetable:
+        while True:
+            conflicts = [
+                t for t in timetable
+                if t != train
+                and t.platform == train.platform
+                and intervals_overlap(train, t)
+            ]
 
-                # Fallback: minimal delay
-                if not reassigned:
-                    delay = earlier.end_time - later.start_time
-                    later.start_time += delay
-                    later.end_time += delay
+            if not conflicts:
+                break
+
+            highest_priority_train = min(
+                [train] + conflicts, key=lambda x: x.priority
+            )
+
+            if highest_priority_train != train:
+                break
+
+            latest_end = max(t.end_time for t in conflicts)
+            delay_needed = latest_end - train.start_time
+
+            best_platform = train.platform
+            best_platform_delay = delay_needed
+
+            for p in platforms:
+                if p == train.platform:
+                    continue
+
+                blocking = [
+                    t for t in timetable
+                    if t.platform == p and intervals_overlap(train, t)
+                ]
+
+                if not blocking:
+                    best_platform = p
+                    best_platform_delay = 0
+                    break
+
+                p_latest_end = max(t.end_time for t in blocking)
+                p_delay = p_latest_end - train.start_time
+
+                if p_delay < best_platform_delay:
+                    best_platform = p
+                    best_platform_delay = p_delay
+
+            train.platform = best_platform
+            train.start_time += best_platform_delay
+            train.end_time += best_platform_delay
+
     return timetable
 
 
@@ -106,9 +138,9 @@ def main():
         print("Running in TEST MODE\n")
         platforms = ["P1", "P2", "P3"]
         timetable = [
-            TrainSchedule("T1", "P1", 10, 20),
-            TrainSchedule("T2", "P1", 12, 18),
-            TrainSchedule("T3", "P2", 15, 25),
+            TrainSchedule("T1", "P1", 10, 20, 1),
+            TrainSchedule("T2", "P1", 12, 18, 3),
+            TrainSchedule("T3", "P2", 15, 25, 2),
         ]
 
     #  REAL USER INPUT MODE
@@ -124,9 +156,10 @@ def main():
             platform = input("Assigned Platform: ")
             start_time = float(input("Start Time: "))
             end_time = float(input("End Time: "))
+            priority = int(input("Priority (lower number = higher priority): "))
 
             timetable.append(
-                TrainSchedule(train_id, platform, start_time, end_time)
+                TrainSchedule(train_id, platform, start_time, end_time, priority)
             )
 
     #  CONFLICT DETECTION 
