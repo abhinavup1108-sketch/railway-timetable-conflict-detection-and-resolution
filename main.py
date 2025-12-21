@@ -2,6 +2,7 @@
 Railway Timetable Conflict Detection and Resolution
 """
 
+import requests
 
 # CONFIGURATION
 
@@ -22,11 +23,21 @@ class TrainSchedule:
         return (
             f"Train {self.train_id} | "
             f"Platform: {self.platform} | "
-            f"Start: {self.start_time} | "
-            f"End: {self.end_time} | "
+            f"Start: {self.start_time:.2f} | "
+            f"End: {self.end_time:.2f} | "
             f"Priority: {self.priority}"
         )
 
+
+ # HELP Convert HH:MM string to float hours
+
+def time_to_float(time_str):
+    """Convert HH:MM string to float hours"""
+    try:
+        h, m = map(int, time_str.split(":"))
+        return h + m / 60
+    except:
+        return 0.0
 
 # INTERVAL LOGIC
 
@@ -123,6 +134,40 @@ def resolve_conflicts(timetable, platforms):
 
     return timetable
 
+# API FETCH FUNCTION 
+
+def fetch_train_schedule(train_numbers, api_url,api_key, api_host):
+    """ This will fetch train schedules from rapid api and return a list of train scchedule objeccts"""
+    timetable = []
+    platforms_set = set()
+
+    for train_number in train_numbers:
+        headers = {
+            "x-rapidapi-key": api_key,
+            "x-rapidapi-host": api_host
+        }
+        url = api_url.replace("{trainNumber}", train_number.strip())
+        
+        response = requests.get(api_url, headers=headers)
+        if response.status_code != 200:
+            print(f"Error fetching train {train_number}: {response.status_code}")
+            continue
+        data = response.json()
+     #   Example parsing: API returns a list of stops
+     #   Adjust "stops", "platform", "arrival", "departure" according to your API
+        for stop in data.get("stops", []):
+
+            train_id = train_number.strip()
+            platform = stop.get("platform") or "P1"
+            start_time = time_to_float(stop.get("arrival", "0:00"))
+            end_time = time_to_float(stop.get("departure", "0:00"))
+            priority = 1 # default priority
+
+            timetable.append(
+                TrainScheddule(train_id, platform, start_time, end_time, priority)
+        )
+        platforms_set.add(platform)
+    return list(platforms_set), timetable
 
 # MAIN EXECUTION
 
@@ -143,24 +188,21 @@ def main():
             TrainSchedule("T3", "P2", 15, 25, 2),
         ]
 
-    #  REAL USER INPUT MODE
+    #  API MODE - Configure your real train schedules
     else:
-        p_count = int(input("Enter number of platforms: "))
-        for i in range(p_count):
-            platforms.append(input(f"Platform {i + 1} ID: "))
+       # API configuration
+      api_url = "https://indian-railways-data-api.p.rapidapi.com/api/v1/trains/{trainNumber}/schedule"
+      api_key = "PASTE_YOUR_RAPIDAPI_KEY_HERE"
+      api_host = "indian-railways-data-api.p.rapidapi.com"
 
-        n = int(input("\nEnter number of trains: "))
-        for i in range(n):
-            print(f"\nEnter details for Train {i + 1}")
-            train_id = input("Train ID: ")
-            platform = input("Assigned Platform: ")
-            start_time = float(input("Start Time: "))
-            end_time = float(input("End Time: "))
-            priority = int(input("Priority (lower number = higher priority): "))
+      train_numbers = input(
+           "Enter train numbers separated by comma: "
+        ).split(",")
 
-            timetable.append(
-                TrainSchedule(train_id, platform, start_time, end_time, priority)
-            )
+      platforms, timetable = fetch_train_schedule(
+                 train_numbers, api_url, api_key, api_host
+        )
+
 
     #  CONFLICT DETECTION 
     conflicts = detect_conflicts(timetable)
@@ -189,3 +231,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
